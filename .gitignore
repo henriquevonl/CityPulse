@@ -1,0 +1,25 @@
+
+# Secrets
+.env
+*.env
+!.env.example
+
+# Airflow
+logs/
+config/
+plugins/
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+
+# Data files
+data/
+*.json
+*.parquet
+
+# IDE
+.vscode/
+.idea/
