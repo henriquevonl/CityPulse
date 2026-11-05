@@ -3,6 +3,8 @@ from datetime import datetime
 import json
 from pathlib import Path
 import pandas as pd
+import os
+import boto3
 
 import requests
 from airflow import DAG
@@ -79,6 +81,33 @@ def convert_to_parquet():
     print("Parquet conversion completed.")
 
 
+def upload_to_r2():
+    s3 = boto3.client(
+        "s3",
+        endpoint_url=os.environ["R2_ENDPOINT_URL"],
+        aws_access_key_id=os.environ["R2_ACCESS_KEY_ID"],
+        aws_secret_access_key=os.environ["R2_SECRET_ACCESS_KEY"],
+        region_name="auto",
+    )
+
+    bucket = os.environ["R2_BUCKET_NAME"]
+
+    parquet_dir = OUTPUT_DIR / "parquet"
+
+    for parquet_file in parquet_dir.glob("*.parquet"):
+        object_key = f"bronze/nyc311/{parquet_file.name}"
+
+        s3.upload_file(
+            str(parquet_file),
+            bucket,
+            object_key,
+        )
+
+        print(f"Uploaded: {object_key}")
+
+    print("R2 upload completed.")
+
+
 with DAG(
     dag_id="nyc311_sample_ingestion",
     start_date=datetime(2026, 1, 1),
@@ -97,4 +126,9 @@ with DAG(
         python_callable=convert_to_parquet,
     )
 
-    extract_batches >> convert_batches
+    upload_batches = PythonOperator(
+    task_id="upload_to_r2",
+    python_callable=upload_to_r2,
+    )
+
+    extract_batches >> convert_batches >> upload_batches
