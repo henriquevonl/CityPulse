@@ -1,33 +1,42 @@
 
-from datetime import datetime
+from datetime import datetime, timedelta
 import json
 from pathlib import Path
 import pandas as pd
 import os
 import boto3
 
+import logging
 import requests
-from airflow import DAG
-from airflow.operators.python import PythonOperator
+from airflow.sdk import DAG, Param, get_current_context
+from airflow.providers.standard.operators.python import PythonOperator
+
+logger = logging.getLogger(__name__)
 
 DATASET_URL = "https://data.cityofnewyork.us/resource/erm2-nwe9.json"
 
 OUTPUT_DIR = Path("/opt/airflow/data/bronze")
 
 
-BATCH_SIZE = 1000
-NUMBER_OF_BATCHES = 3
-
-
 def extract_sample():
+    context = get_current_context()
+
+    batch_size = context["params"]["batch_size"]
+    number_of_batches = context["params"]["number_of_batches"]
+
+    logger.info(
+        f"Starting extraction: "
+        f"{batch_size=} {number_of_batches=}"
+    )
+
     OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
 
-    for batch_number in range(NUMBER_OF_BATCHES):
+    for batch_number in range(number_of_batches):
 
-        offset = batch_number * BATCH_SIZE
+        offset = batch_number * batch_size
 
         params = {
-            "$limit": BATCH_SIZE,
+            "$limit": batch_size,
             "$offset": offset,
             "$select": "unique_key,created_date,closed_date,agency,complaint_type,borough,status",
             "$order": "created_date DESC,unique_key DESC",
@@ -44,7 +53,7 @@ def extract_sample():
         records = response.json()
 
         if not records:
-            print("No more records available.")
+            logger.info("No more records available.")
             break
 
         output_file = OUTPUT_DIR / f"batch_{batch_number + 1:05d}.json"
@@ -52,12 +61,12 @@ def extract_sample():
         with output_file.open("w", encoding="utf-8") as file:
             json.dump(records, file, ensure_ascii=False, indent=2)
 
-        print(
+        logger.info(
             f"Batch {batch_number + 1}: "
             f"{len(records)} records saved to {output_file}"
         )
 
-    print("Batch ingestion completed.")
+    logger.info("Batch ingestion completed.")
 
 
 def convert_to_parquet():
@@ -76,9 +85,9 @@ def convert_to_parquet():
 
         df.to_parquet(parquet_file, index=False)
 
-        print(f"Converted {json_file.name} -> {parquet_file.name}")
+        logger.info(f"Converted {json_file.name} -> {parquet_file.name}")
 
-    print("Parquet conversion completed.")
+    logger.info("Parquet conversion completed.")
 
 
 def upload_to_r2():
@@ -103,9 +112,9 @@ def upload_to_r2():
             object_key,
         )
 
-        print(f"Uploaded: {object_key}")
+        logger.info(f"Uploaded: {object_key}")
 
-    print("R2 upload completed.")
+    logger.info("R2 upload completed.")
 
 
 with DAG(
@@ -114,6 +123,27 @@ with DAG(
     schedule=None,
     catchup=False,
     tags=["citypulse", "ingestion"],
+
+    params={
+        "batch_size": Param(
+            1000,
+            type="integer",
+            minimum=1,
+            maximum=50000,
+        ),
+        "number_of_batches": Param(
+            5,
+            type="integer",
+            minimum=1,
+            maximum=100,
+        ),
+    },
+
+    default_args={
+        "retries": 3,
+        "retry_delay": timedelta(minutes=2),
+    },
+
 ) as dag:
 
     extract_batches = PythonOperator(
