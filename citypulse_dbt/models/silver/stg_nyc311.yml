@@ -1,0 +1,17 @@
+
+version: 2
+
+models:
+  - name: stg_nyc311
+    description: "Cleaned staging data for NYC 311 service requests."
+
+    columns:
+      - name: unique_key
+        description: "Unique identifier for each NYC 311 request."
+        data_tests:
+          - not_null
+          - unique
+
+      - name: created_date
+        data_tests:
+          - not_null
