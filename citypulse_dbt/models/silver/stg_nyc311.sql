@@ -10,8 +10,8 @@ SELECT
     UPPER(TRIM(borough)) AS borough,
     status
 FROM read_files(
-    'r2://citypulse-bronze@72f1f0ca3c53f9db09ed9595bd8f3b62.r2.cloudflarestorage.com/bronze/nyc311/',
-    format => 'parquet'
+    'r2://citypulse-bronze@72f1f0ca3c53f9db09ed9595bd8f3b62.r2.cloudflarestorage.com/bronze/nyc311/
+nyc311_export.parquet'
 )
 WHERE unique_key IS NOT NULL
 QUALIFY ROW_NUMBER() OVER (
