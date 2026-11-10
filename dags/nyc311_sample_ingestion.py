@@ -197,6 +197,9 @@ def convert_csv_to_parquet():
 
     df.to_parquet(parquet_file, index=False)
 
+    # Read the Parquet back
+    df_parquet = pd.read_parquet(parquet_file)
+
     logger.info(
         f"Converted {len(df)} records "
         f"from CSV to Parquet: {parquet_file}"
