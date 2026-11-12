@@ -224,7 +224,7 @@ def convert_to_parquet():
 
         logger.info(f"Converted {json_file.name} -> {parquet_file.name}")
 
-    logger.info("Parquet conversion completed.")
+    logger.info("Parquet file conversion completed.")
 
 
 def upload_one_parquet_to_r2():
