@@ -48,6 +48,8 @@ def test_export():
 
     response.raise_for_status()
 
+    OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
+
     output_file = OUTPUT_DIR / "nyc311_export.csv"
 
     with output_file.open("wb") as file:
